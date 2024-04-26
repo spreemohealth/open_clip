@@ -15,11 +15,13 @@ class ParseKwargs(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         kw = {}
         for value in values:
-            key, value = value.split('=')
+            key, value = value.split("=")
             try:
                 kw[key] = ast.literal_eval(value)
             except ValueError:
-                kw[key] = str(value)  # fallback to string (avoid need to escape on command line)
+                kw[key] = str(
+                    value
+                )  # fallback to string (avoid need to escape on command line)
         setattr(namespace, self.dest, kw)
 
 
@@ -39,7 +41,7 @@ def parse_args(args):
             "When using multiple data sources with webdataset and sampling with replacement, this can be used to upsample specific data sources. "
             "Similar to --train-data, this should be a string with as many numbers as there are data sources, separated by `::` (e.g. 1::2::0.5) "
             "By default, datapoints are sampled uniformly regardless of the dataset sizes."
-        )
+        ),
     )
     parser.add_argument(
         "--val-data",
@@ -61,33 +63,33 @@ def parse_args(args):
     )
     parser.add_argument(
         "--dataset-type",
-        choices=["webdataset", "csv", "synthetic", "auto"],
+        choices=["webdataset", "csv", "synthetic", "auto", "mhddataset"],
         default="auto",
-        help="Which type of dataset to process."
+        help="Which type of dataset to process.",
     )
     parser.add_argument(
         "--dataset-resampled",
         default=False,
         action="store_true",
-        help="Whether to use sampling with replacement for webdataset shard selection."
+        help="Whether to use sampling with replacement for webdataset shard selection.",
     )
     parser.add_argument(
         "--csv-separator",
         type=str,
         default="\t",
-        help="For csv-like datasets, which separator to use."
+        help="For csv-like datasets, which separator to use.",
     )
     parser.add_argument(
         "--csv-img-key",
         type=str,
         default="filepath",
-        help="For csv-like datasets, the name of the key for the image paths."
+        help="For csv-like datasets, the name of the key for the image paths.",
     )
     parser.add_argument(
         "--csv-caption-key",
         type=str,
         default="title",
-        help="For csv-like datasets, the name of the key for the captions."
+        help="For csv-like datasets, the name of the key for the captions.",
     )
     parser.add_argument(
         "--imagenet-val",
@@ -129,8 +131,10 @@ def parse_args(args):
         "--epochs", type=int, default=32, help="Number of epochs to train for."
     )
     parser.add_argument(
-        "--epochs-cooldown", type=int, default=None,
-        help="When scheduler w/ cooldown used, perform cooldown from total_epochs - cooldown_epochs onwards."
+        "--epochs-cooldown",
+        type=int,
+        default=None,
+        help="When scheduler w/ cooldown used, perform cooldown from total_epochs - cooldown_epochs onwards.",
     )
     parser.add_argument("--lr", type=float, default=None, help="Learning rate.")
     parser.add_argument("--beta1", type=float, default=None, help="Adam beta 1.")
@@ -144,7 +148,8 @@ def parse_args(args):
         "--use-bn-sync",
         default=False,
         action="store_true",
-        help="Whether to use batch norm sync.")
+        help="Whether to use batch norm sync.",
+    )
     parser.add_argument(
         "--skip-scheduler",
         action="store_true",
@@ -154,16 +159,20 @@ def parse_args(args):
     parser.add_argument(
         "--lr-scheduler",
         type=str,
-        default='cosine',
+        default="cosine",
         help="LR scheduler. One of: 'cosine', 'const' (constant), 'const-cooldown' (constant w/ cooldown). Default: cosine",
     )
     parser.add_argument(
-        "--lr-cooldown-end", type=float, default=0.0,
-        help="End learning rate for cooldown schedule. Default: 0"
+        "--lr-cooldown-end",
+        type=float,
+        default=0.0,
+        help="End learning rate for cooldown schedule. Default: 0",
     )
     parser.add_argument(
-        "--lr-cooldown-power", type=float, default=1.0,
-        help="Power for polynomial cooldown schedule. Default: 1.0 (linear decay)"
+        "--lr-cooldown-power",
+        type=float,
+        default=1.0,
+        help="Power for polynomial cooldown schedule. Default: 1.0 (linear decay)",
     )
     parser.add_argument(
         "--save-frequency", type=int, default=1, help="How often to save checkpoints."
@@ -178,7 +187,10 @@ def parse_args(args):
         "--zeroshot-frequency", type=int, default=2, help="How often to run zero shot."
     )
     parser.add_argument(
-        "--val-frequency", type=int, default=1, help="How often to run evaluation with val data."
+        "--val-frequency",
+        type=int,
+        default=1,
+        help="How often to run evaluation with val data.",
     )
     parser.add_argument(
         "--resume",
@@ -188,9 +200,18 @@ def parse_args(args):
     )
     parser.add_argument(
         "--precision",
-        choices=["amp", "amp_bf16", "amp_bfloat16", "bf16", "fp16", "pure_bf16", "pure_fp16", "fp32"],
+        choices=[
+            "amp",
+            "amp_bf16",
+            "amp_bfloat16",
+            "bf16",
+            "fp16",
+            "pure_bf16",
+            "pure_fp16",
+            "fp32",
+        ],
         default="amp",
-        help="Floating point precision."
+        help="Floating point precision.",
     )
     parser.add_argument(
         "--model",
@@ -200,20 +221,20 @@ def parse_args(args):
     )
     parser.add_argument(
         "--pretrained",
-        default='',
+        default="",
         type=str,
         help="Use a pretrained CLIP model weights with the specified tag or file path.",
     )
     parser.add_argument(
         "--pretrained-image",
         default=False,
-        action='store_true',
+        action="store_true",
         help="Load imagenet pretrained weights for image tower backbone if available.",
     )
     parser.add_argument(
         "--lock-image",
         default=False,
-        action='store_true',
+        action="store_true",
         help="Lock full image tower by disabling gradients.",
     )
     parser.add_argument(
@@ -225,52 +246,69 @@ def parse_args(args):
     parser.add_argument(
         "--lock-image-freeze-bn-stats",
         default=False,
-        action='store_true',
+        action="store_true",
         help="Freeze BatchNorm running stats in image tower for any locked layers.",
     )
     parser.add_argument(
-        '--image-mean', type=float, nargs='+', default=None, metavar='MEAN',
-        help='Override default image mean value of dataset')
-    parser.add_argument(
-        '--image-std', type=float, nargs='+', default=None, metavar='STD',
-        help='Override default image std deviation of of dataset')
-    parser.add_argument(
-        '--image-interpolation',
-        default=None, type=str, choices=['bicubic', 'bilinear', 'random'],
-        help="Override default image resize interpolation"
+        "--image-mean",
+        type=float,
+        nargs="+",
+        default=None,
+        metavar="MEAN",
+        help="Override default image mean value of dataset",
     )
     parser.add_argument(
-        '--image-resize-mode',
-        default=None, type=str, choices=['shortest', 'longest', 'squash'],
-        help="Override default image resize (& crop) mode during inference"
+        "--image-std",
+        type=float,
+        nargs="+",
+        default=None,
+        metavar="STD",
+        help="Override default image std deviation of of dataset",
     )
-    parser.add_argument('--aug-cfg', nargs='*', default={}, action=ParseKwargs)
+    parser.add_argument(
+        "--image-interpolation",
+        default=None,
+        type=str,
+        choices=["bicubic", "bilinear", "random"],
+        help="Override default image resize interpolation",
+    )
+    parser.add_argument(
+        "--image-resize-mode",
+        default=None,
+        type=str,
+        choices=["shortest", "longest", "squash"],
+        help="Override default image resize (& crop) mode during inference",
+    )
+    parser.add_argument("--aug-cfg", nargs="*", default={}, action=ParseKwargs)
     parser.add_argument(
         "--grad-checkpointing",
         default=False,
-        action='store_true',
+        action="store_true",
         help="Enable gradient checkpointing.",
     )
     parser.add_argument(
         "--local-loss",
         default=False,
         action="store_true",
-        help="calculate loss w/ local features @ global (instead of realizing full global @ global matrix)"
+        help="calculate loss w/ local features @ global (instead of realizing full global @ global matrix)",
     )
     parser.add_argument(
         "--gather-with-grad",
         default=False,
         action="store_true",
-        help="enable full distributed gradient for feature gather"
+        help="enable full distributed gradient for feature gather",
     )
     parser.add_argument(
-        '--force-image-size', type=int, nargs='+', default=None,
-        help='Override default image size'
+        "--force-image-size",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Override default image size",
     )
     parser.add_argument(
         "--force-quick-gelu",
         default=False,
-        action='store_true',
+        action="store_true",
         help="Force use of QuickGELU activation for non-OpenAI transformer models.",
     )
     parser.add_argument(
@@ -282,29 +320,32 @@ def parse_args(args):
     parser.add_argument(
         "--force-custom-text",
         default=False,
-        action='store_true',
+        action="store_true",
         help="Force use of CustomTextCLIP model (separate text-tower).",
     )
     parser.add_argument(
         "--torchscript",
         default=False,
-        action='store_true',
+        action="store_true",
         help="torch.jit.script the model, also uses jit version of OpenAI models if pretrained=='openai'",
     )
     parser.add_argument(
         "--torchcompile",
         default=False,
-        action='store_true',
+        action="store_true",
         help="torch.compile() the model, requires pytorch 2.0 or later.",
     )
     parser.add_argument(
         "--trace",
         default=False,
-        action='store_true',
+        action="store_true",
         help="torch.jit.trace the model for inference / eval only",
     )
     parser.add_argument(
-        "--accum-freq", type=int, default=1, help="Update the model every --acum-freq steps."
+        "--accum-freq",
+        type=int,
+        default=1,
+        help="Update the model every --acum-freq steps.",
     )
     # arguments for distributed training
     parser.add_argument(
@@ -318,62 +359,57 @@ def parse_args(args):
     )
     parser.add_argument(
         "--report-to",
-        default='',
+        default="",
         type=str,
-        help="Options are ['wandb', 'tensorboard', 'wandb,tensorboard']"
+        help="Options are ['wandb', 'tensorboard', 'wandb,tensorboard']",
     )
     parser.add_argument(
-        "--wandb-notes",
-        default='',
-        type=str,
-        help="Notes if logging with wandb"
+        "--wandb-notes", default="", type=str, help="Notes if logging with wandb"
     )
     parser.add_argument(
         "--wandb-project-name",
         type=str,
-        default='open-clip',
+        default="open-clip",
         help="Name of the project if logging with wandb.",
     )
     parser.add_argument(
         "--debug",
         default=False,
         action="store_true",
-        help="If true, more information is logged."
+        help="If true, more information is logged.",
     )
     parser.add_argument(
         "--copy-codebase",
         default=False,
         action="store_true",
-        help="If true, we copy the entire base on the log directory, and execute from there."
+        help="If true, we copy the entire base on the log directory, and execute from there.",
     )
     parser.add_argument(
         "--horovod",
         default=False,
         action="store_true",
-        help="Use horovod for distributed training."
+        help="Use horovod for distributed training.",
     )
     parser.add_argument(
         "--ddp-static-graph",
         default=False,
-        action='store_true',
+        action="store_true",
         help="Enable static graph optimization for DDP in PyTorch >= 1.11.",
     )
     parser.add_argument(
         "--no-set-device-rank",
         default=False,
         action="store_true",
-        help="Don't set device index from local rank (when CUDA_VISIBLE_DEVICES restricted to one per proc)."
+        help="Don't set device index from local rank (when CUDA_VISIBLE_DEVICES restricted to one per proc).",
     )
-    parser.add_argument(
-        "--seed", type=int, default=0, help="Default random seed."
-    )
+    parser.add_argument("--seed", type=int, default=0, help="Default random seed.")
     parser.add_argument(
         "--grad-clip-norm", type=float, default=None, help="Gradient clip."
     )
     parser.add_argument(
         "--lock-text",
         default=False,
-        action='store_true',
+        action="store_true",
         help="Lock full text tower by disabling gradients.",
     )
     parser.add_argument(
@@ -385,7 +421,7 @@ def parse_args(args):
     parser.add_argument(
         "--lock-text-freeze-layer-norm",
         default=False,
-        action='store_true',
+        action="store_true",
         help="Freeze LayerNorm running stats in text tower for any locked layers.",
     )
     parser.add_argument(
@@ -398,13 +434,13 @@ def parse_args(args):
         "--coca-caption-loss-weight",
         type=float,
         default=2.0,
-        help="Weight assigned to caption loss in CoCa."
+        help="Weight assigned to caption loss in CoCa.",
     )
     parser.add_argument(
         "--coca-contrastive-loss-weight",
         type=float,
         default=1.0,
-        help="Weight assigned to contrastive loss when training CoCa."
+        help="Weight assigned to contrastive loss when training CoCa.",
     )
     parser.add_argument(
         "--remote-sync",
@@ -428,29 +464,29 @@ def parse_args(args):
         "--delete-previous-checkpoint",
         default=False,
         action="store_true",
-        help="If true, delete previous checkpoint after storing a new one."
+        help="If true, delete previous checkpoint after storing a new one.",
     )
     parser.add_argument(
         "--distill-model",
         default=None,
-        help='Which model arch to distill from, if any.'
+        help="Which model arch to distill from, if any.",
     )
     parser.add_argument(
         "--distill-pretrained",
         default=None,
-        help='Which pre-trained weights to distill from, if any.'
+        help="Which pre-trained weights to distill from, if any.",
     )
     parser.add_argument(
         "--use-bnb-linear",
         default=None,
-        help='Replace the network linear layers from the bitsandbytes library. '
-        'Allows int8 training/inference, etc.'
+        help="Replace the network linear layers from the bitsandbytes library. "
+        "Allows int8 training/inference, etc.",
     )
     parser.add_argument(
         "--siglip",
         default=False,
         action="store_true",
-        help='Use SigLip (sigmoid) loss.'
+        help="Use SigLip (sigmoid) loss.",
     )
 
     args = parser.parse_args(args)
