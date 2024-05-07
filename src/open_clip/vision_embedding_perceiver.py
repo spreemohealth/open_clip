@@ -91,11 +91,16 @@ class VisionEmbedding(nn.Module):
         else:
             B, S, C, H, W = orig_shape
 
+        # print("vision_tower: ", self.vision_tower)
         if "ModifiedResNet" in self.vision_tower:
             B_S, D, R, C = vision_x.shape
             vision_x = rearrange(
                 vision_x, "bs d r c -> bs (r c) d", bs=B_S, d=D, r=R, c=C
             )
+        elif "open_clip.transformer.VisionTransformer" in self.vision_tower:
+            if type(vision_x) == tuple:
+                _, vision_x = vision_x
+        #     B_S, D = vision_x.shape
 
         vision_x = rearrange(vision_x, "(b s F) v d -> b s F v d", b=B, s=S, F=1)
 

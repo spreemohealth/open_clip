@@ -1,0 +1,30 @@
+{
+    "embed_dim": 1024,
+    "vision_cfg": {
+        "reduce_dim": "True",
+        "vision_out_dim": 768,
+        "vision_tower_config": {
+            "image_size": 224,
+            "timm_model_name": "vit_base_patch16_clip_224.laion2b_ft_in12k_in1k",
+            "timm_model_pretrained": false,
+            "timm_pool": "map",
+            "timm_proj": "none"
+        },
+        "perceiver_config": {
+            "num_latents": 1,
+            "max_num_media": 4,
+            "depth": 6,
+            "dim_head": 64,
+            "heads": 8,
+            "ff_mult": 4,
+            "dim": 512
+        },
+        "embed_dim": 1024
+    },
+    "text_cfg": {
+        "hf_model_name": "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext",
+        "hf_tokenizer_name": "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext",
+        "hf_pooler_type": "cls_last_hidden_state_pooler",
+        "context_length": 384
+    }
+}
