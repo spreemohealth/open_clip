@@ -2,18 +2,15 @@
     "embed_dim": 1024,
     "vision_cfg": {
         "reduce_dim": "True",
-        "vision_out_dim": 2048,
+        "vision_out_dim": 1024,
         "vision_tower_config": {
-            "image_size": 224,
-            "input_channels": 1,
-            "layers": [
-                3,
-                4,
-                6,
-                3
-            ],
-            "width": 64,
-            "patch_size": null
+            "timm_model_name": "convnext_base",
+            "timm_model_pretrained": false,
+            "timm_pool": "",
+            "timm_proj": "linear",
+            "timm_drop": 0.0,
+            "timm_drop_path": 0.1,
+            "image_size": 224
         },
         "perceiver_config": {
             "num_latents": 1,

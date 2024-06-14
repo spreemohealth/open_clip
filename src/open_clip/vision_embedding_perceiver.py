@@ -92,7 +92,7 @@ class VisionEmbedding(nn.Module):
             B, S, C, H, W = orig_shape
 
         # print("vision_tower: ", self.vision_tower)
-        if "ModifiedResNet" in self.vision_tower:
+        if "ModifiedResNet" in self.vision_tower or "ConvNeXt" in self.vision_tower:
             B_S, D, R, C = vision_x.shape
             vision_x = rearrange(
                 vision_x, "bs d r c -> bs (r c) d", bs=B_S, d=D, r=R, c=C
@@ -112,6 +112,7 @@ class VisionEmbedding(nn.Module):
             "timm" in self.vision_tower
             or self.vision_tower
             == "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224"
+            or "ConvNeXt" in self.vision_tower
         ):
             vision_x = self.vision_encoder.forward_features(vision_x)
         else:

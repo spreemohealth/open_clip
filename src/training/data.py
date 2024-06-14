@@ -58,6 +58,7 @@ from cvtoolsaugmentations.image_io import (
 from monai.utils import Method
 from MhdHelpers.mhd_handler import MhdHandler
 from PIL import Image
+import cv2
 
 
 class CsvDataset(Dataset):
@@ -112,8 +113,6 @@ class MhDDataset(Dataset):
 
         self.df = self.df.sample(frac=1, random_state=8).reset_index(drop=True)
 
-        self.image_columns = [col for col in self.df.columns if "x_" in col]
-
         logging.info("loaded dataset")
 
         self.study_ids = list(self.df.study_id.unique())
@@ -136,12 +135,30 @@ class MhDDataset(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def load_mhd(self, img_path):
+    def load_mhd(self, img_path, inverse=False):
 
         if self.transforms is not None:
-            image = MhdHandler(img_path).raw_data.astype(float)
+            image = MhdHandler(img_path).raw_data[0].astype(float)
+
+            if inverse:
+                image = np.amax(image) - image
+
             image = (image - np.min(image)) / (np.max(image) - np.min(image))
-            image = (image * 255).astype(np.uint8).squeeze(0)
+
+            image = (image * 255).astype(np.uint8)
+
+            clip_limit = np.random.choice([2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
+
+            grid_sizes = [(2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8)]
+            grid_choice = np.random.choice(np.arange(len(grid_sizes)))
+            grid_size = grid_sizes[grid_choice]
+
+            clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=grid_size)
+
+            image = clahe.apply(image)
+
+            #      ...:                 for j in [(2,2),(3,3),(4,4),(5,5),(6,6),(7,7),(8,8)]:
+            #      ...:                     clahe = cv2.createCLAHE(clipLimit=i, tileGridSize=j)
 
             # print(
             #     "raw image: ",
@@ -165,33 +182,67 @@ class MhDDataset(Dataset):
 
     def get_images(self, row):
 
-        image_paths = []
-        for series in self.series_list:
-            image_paths.append(row["x_" + series])
+        # image_paths = []
+        # if type(self.series_list) == list:
+        image_paths = list(row["view_dict"].values())
+
+        # for series in series_list:
+        #     image_paths.append(row["view_dict"][series])
+
+        # series_x = []
+        # for series in series_list:
+        #     # print(series)
+
+        #     series_x_i = [0] * len(self.series_list)
+        #     for s_i, series_level in enumerate(self.series_list):
+        #         for l_i, series_constitute in enumerate(series_level):
+        # if series_constitute in series:
+        #     series_x_i[s_i] = l_i
+        #     break
+
+        # print(series_x_i)
+        # series_x.append(series_x_i)
+
+        # series_x = list(series_list)
+        # elif type(self.series_list) == list:
+        #     for series in self.series_list:
+        #         image_paths.append(row["x_" + series])
+        #     series_x = None
 
         images = []
         series_mask = []
-        for i, image_path in enumerate(image_paths):
-            if image_path is None or pd.isna(image_path):
-                images.append(torch.rand(self.nchannels, self.nrows, self.nrows))
-                series_mask.append(0)
-            else:
-                image = self.load_mhd(os.path.join(self.base_path, image_path))
-                images.append(image)
-                # images.append(image.unsqueeze(0).repeat(self.nchannels, 1, 1, 1))
-                series_mask.append(1)
-            # print(self.series_list[i], images[-1].shape)
+        # for i, image_path in enumerate(image_paths):
+        for view, image_path in row["view_dict"].items():
+            # if image_path is None or pd.isna(image_path):
+            #     images.append(
+            #         torch.rand(self.nchannels, self.nrows, self.nrows, self.ndepth)
+            #     )
+            #     series_mask.append(0)
+            # else:
+            image = self.load_mhd(
+                os.path.join(self.base_path, image_path),
+                row["image_metadata"]["photometric_interpretation"][view]
+                == "MONOCHROME1",
+            )
+            images.append(image)
+            series_mask.append(1)
+
+            # images.append(
+            #     torch.from_numpy(image).unsqueeze(0).repeat(self.nchannels, 1, 1, 1)
+            # )
+        # print(torch.min(images[-1]), torch.max(images[-1]), torch.mean(images[-1]), torch.std(images[-1]))
 
         images = torch.stack(images, dim=0)
         series_mask = torch.LongTensor(series_mask)
+        # series_x = torch.LongTensor(series_x)
 
-        return images, series_mask
+        return images, None, series_mask
 
     def __getitem__(self, index):
 
         row = self.df.iloc[index]
 
-        vision_x, series_mask = self.get_images(row)
+        vision_x, series_x, series_mask = self.get_images(row)
 
         p = torch.rand(1).item()
         if p < float(1 / 3):
@@ -679,6 +730,123 @@ def get_csv_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
     return DataInfo(dataloader, sampler)
 
 
+class MhD_Collator(object):
+
+    def __call__(self, instances):
+
+        # vision_xs, series_masks, series_xs, lang_xs, attention_masks, labels = tuple(
+        #     [instance[key] for instance in instances]
+        #     for key in (
+        #         "vision_x",
+        #         "series_mask",
+        #         "series_x",
+        #         "lang_x",
+        #         "attention_mask",
+        #         "labels",
+        #     )
+        # )
+        vision_xs = []
+        series_masks = []
+        lang_xs = []
+        for instance in instances:
+            vision_x, series_mask, lang_x = instance
+            vision_xs.append(vision_x)
+            series_masks.append(series_mask)
+            lang_xs.append(lang_x)
+
+        # study_id = tuple(
+        #     [instance[key] for instance in instances] for key in ("study_id")
+        # )
+        # print(study_id)
+
+        max_series_len = max([len(x_i) for x_i in series_masks])
+
+        # for x_i in series_xs:
+        #     print(x_i.shape)
+
+        # series_x = torch.stack(
+        #     [
+        #         torch.cat(
+        #             [
+        #                 series_x_i,
+        #                 torch.zeros(
+        #                     max_series_len - len(series_x_i), series_x_i[0].shape[-1]
+        #                 ).long(),
+        #             ]
+        #         )
+        #         for series_x_i in series_xs
+        #     ],
+        #     axis=0,
+        # )
+
+        # print("series_x: ", series_x.shape)
+
+        series_masks = torch.stack(
+            [
+                torch.cat(
+                    [
+                        series_mask_i,
+                        torch.zeros(max_series_len - len(series_mask_i)).long(),
+                    ]
+                )
+                for series_mask_i in series_masks
+            ],
+            axis=0,
+        )
+
+        # print("series_mask: ", series_mask.shape)
+
+        vision_xs = torch.stack(
+            [
+                torch.cat(
+                    [
+                        vision_x_i,
+                        torch.zeros(vision_x_i[0].shape)
+                        .unsqueeze(0)
+                        .repeat(max_series_len - len(vision_x_i), 1, 1, 1),
+                    ]
+                )
+                for vision_x_i in vision_xs
+            ],
+            axis=0,
+        )
+
+        # print("vision_xs: ", vision_xs.shape)
+
+        # max_len = max([len(x_i) for x_i in lang_xs])
+
+        # print('lang_xs: ', lang_xs)
+
+        # for lang_x in lang_xs:
+        #     print(lang_x.shape)
+
+        lang_xs = torch.stack(lang_xs)
+        # lang_xs = torch.cat(
+        #     [
+        #         torch.cat(
+        #             [lang_xi, torch.zeros(max_len - len(lang_xi)).long()]
+        #         ).unsqueeze(0)
+        #         for lang_xi in lang_xs
+        #     ],
+        #     dim=0,
+        # )
+
+        # vision_xs = torch.stack(vision_xs)
+
+        # series_mask = torch.stack(series_mask)
+
+        # print("lang_xs: ", lang_xs.shape)
+        # print("vision_xs: ", vision_xs.shape)
+        # print("attn_mask: ", attention_masks.shape)
+        # print("labels: ", labels.shape)
+
+        # print(vision_xs.shape)
+        # print(series_masks.shape)
+        # print(lang_xs.shape)
+
+        return (vision_xs, series_masks, lang_xs)
+
+
 def get_mhd_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
     input_filename = args.train_data if is_train else args.val_data
     assert input_filename
@@ -689,8 +857,10 @@ def get_mhd_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
     )
     # print("dataset vis")
     # for i in dataset:
-    #     image, text = i
-    #     print(image.shape, text.shape)
+    #     image, mask, text = i
+    #     print(image.shape, mask.shape, text.shape)
+    #     #     image, text = i
+    #     #     print(image.shape, text.shape)
     #     break
     # input("enter to continue")
     num_samples = len(dataset)
@@ -705,13 +875,15 @@ def get_mhd_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
         pin_memory=True,
         sampler=sampler,
         drop_last=is_train,
+        collate_fn=MhD_Collator(),
     )
     # print("dataloader vis")
     # for b in dataloader:
-    #     image, text = b
-    #     print(image.shape, text.shape)
+    #     image, mask, text = b
+    #     print(image.shape, mask.shape, text.shape)
     #     break
 
+    # input("enter to continue")
     dataloader.num_samples = num_samples
     dataloader.num_batches = len(dataloader)
 

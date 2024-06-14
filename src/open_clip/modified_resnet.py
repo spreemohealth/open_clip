@@ -123,14 +123,16 @@ class ModifiedResNet(nn.Module):
     - The final pooling layer is a QKV attention instead of an average pool
     """
 
-    def __init__(self, layers, output_dim, heads, image_size=224, width=64):
+    def __init__(
+        self, input_channels, layers, output_dim, heads, image_size=224, width=64
+    ):
         super().__init__()
         self.output_dim = output_dim
         self.image_size = image_size
 
         # the 3-layer stem
         self.conv1 = nn.Conv2d(
-            3, width // 2, kernel_size=3, stride=2, padding=1, bias=False
+            input_channels, width // 2, kernel_size=3, stride=2, padding=1, bias=False
         )
         self.bn1 = nn.BatchNorm2d(width // 2)
         self.act1 = nn.ReLU(inplace=True)

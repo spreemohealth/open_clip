@@ -184,6 +184,11 @@ def parse_args(args):
         help="Always save the most recent model trained to epoch_latest.pt.",
     )
     parser.add_argument(
+        "--save-with-metric",
+        default="clip_val_loss",
+        help="Always save the most recent model trained to epoch_latest.pt.",
+    )
+    parser.add_argument(
         "--zeroshot-frequency", type=int, default=2, help="How often to run zero shot."
     )
     parser.add_argument(

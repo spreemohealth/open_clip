@@ -17,6 +17,7 @@ from functools import partial
 @dataclass
 class CLIPVisionCfg:
     layers: Union[Tuple[int, int, int, int], int] = 12
+    input_channels: int = 3
     width: int = 768
     head_width: int = 64
     mlp_ratio: float = 4.0
@@ -96,6 +97,7 @@ def _build_vision_tower(
         elif isinstance(vision_cfg.layers, (tuple, list)):
             vision_heads = vision_cfg.width * 32 // vision_cfg.head_width
             visual = ModifiedResNet(
+                input_channels=vision_cfg.input_channels,
                 layers=vision_cfg.layers,
                 output_dim=embed_dim,
                 heads=vision_heads,
@@ -140,8 +142,17 @@ def _build_vision_tower(
             vision_model = _build_vision_tower(
                 embed_dim, vision_cfg.vision_tower_config, quick_gelu, cast_dtype
             )
+
             if "ModifiedResNet" in str(type(vision_model)):
                 vision_model.attnpool = nn.Identity()
+            elif "TimmModel" in str(type(vision_model)):
+                vision_model = vision_model.trunk
+                vision_model.head = nn.Identity()
+                # vision_model.head = nn.Identity()
+
+            # print(vision_model)
+            # input("enter to continue")
+
             vision_cfg.vision_model = vision_model
             vision_cfg.perceiver_config = Perceiver_Config(
                 **vision_cfg.perceiver_config

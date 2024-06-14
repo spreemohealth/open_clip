@@ -109,6 +109,7 @@ class PerceiverResampler(nn.Module):
         max_num_media = getattr(config, "max_num_media", None)
         max_num_frames = getattr(config, "max_num_frames", None)
         ff_mult = getattr(config, "ff_mult", 4)
+        self.combine_series_strategy = getattr(config, "combine_series_strategy", None)
 
         self.latents = nn.Parameter(torch.randn(num_latents, dim))
         self.frame_embs = (
@@ -116,11 +117,23 @@ class PerceiverResampler(nn.Module):
             if exists(max_num_frames)
             else None
         )
-        self.media_time_embs = (
-            nn.Parameter(torch.randn(max_num_media, 1, dim))
-            if exists(max_num_media)
-            else None
-        )
+
+        if exists(max_num_media):
+            if type(max_num_media) == int:
+                self.media_time_embs = nn.Parameter(torch.randn(max_num_media, 1, dim))
+            elif type(max_num_media) == list:
+                self.num_series_levels = len(max_num_media)
+                self.media_time_embs = nn.ModuleDict(
+                    {
+                        str(i): nn.Embedding(max_num_media[i], dim, padding_idx=0)
+                        for i in range(self.num_series_levels)
+                    }
+                )
+                self.series_layer_norm = nn.LayerNorm(dim)
+            else:
+                raise NotImplementedError
+        else:
+            self.media_time_embs = None
 
         self.layers = nn.ModuleList([])
         for _ in range(depth):
@@ -145,22 +158,25 @@ class PerceiverResampler(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
-    def forward(self, x, mask=None):
+    def forward(self, x, series_x=None, mask=None):
         """
         Args:
             x (torch.Tensor): image features
                 shape (b, T, F, v, D)
+                b =  batch
+                T = num_series
+                F = useless dimension (=1)
+                v = seq len / num_visual_tokens from vision tower
+                D = hidden dim
         Returns:
             shape (b, T, n, D) where n is self.num_latents
         """
         b, T, F, v = x.shape[:4]
 
-        # print("input: ", x.shape)
         # frame and media time embeddings
         if exists(self.frame_embs):
             frame_embs = repeat(self.frame_embs[:F], "F d -> b T F v d", b=b, T=T, v=v)
             x = x + frame_embs
-
         x = rearrange(
             x, "b T F v d -> b T (F v) d"
         )  # flatten the frame and spatial dimensions
@@ -170,20 +186,46 @@ class PerceiverResampler(nn.Module):
             mask = mask.unsqueeze(-1).repeat(1, 1, x.shape[2])
 
         if exists(self.media_time_embs):
-            ## concatenating all the series together
-            x = x + self.media_time_embs[:T]
-            x = rearrange(x, "b T P d -> b 1 (T P) d")
-            if exists(mask):
-                mask = rearrange(mask, "b T P -> b 1 (T P)")
-            T = 1
+            if type(self.media_time_embs) == nn.ModuleDict:
+                for level_i in range(self.num_series_levels):
+                    if level_i == 0:
+                        embedding = self.media_time_embs[str(level_i)](
+                            series_x[:, :, level_i]
+                        )
+                    else:
+                        embedding += self.media_time_embs[str(level_i)](
+                            series_x[:, :, level_i]
+                        )
+                embedding = embedding.unsqueeze(-2)
+                # print("media time embedding: ", embedding.shape)
+                x = x + embedding
+                x = self.series_layer_norm(x)
+                # if self.combine_series_strategy == "concat":
+                #     x = rearrange(x, "b T P d -> b 1 (T P) d")
+                #     if exists(mask):
+                #         mask = rearrange(mask, "b T P -> b 1 (T P)")
+                #     T = 1
+            else:
+                ## concatenating all the series together
+                x = x + self.media_time_embs[:T]
+
             # print("after rearranging time dimension: ", x.shape)
 
         # print("media time embeddings: ", self.media_time_embs.shape)
         # print("after flattening frame and media dimensions: ", x.shape)
 
+        if self.combine_series_strategy == "concat":
+            x = rearrange(x, "b T P d -> b 1 (T P) d")
+            if exists(mask):
+                mask = rearrange(
+                    mask, "b T P -> b 1 (T P)"
+                )  # p = num_visual_tokens * F
+            T = 1
+
         # blocks
         latents = repeat(self.latents, "n d -> b T n d", b=b, T=T)
         # print("latents: ", latents.shape)
+        # print("mask: ", mask.shape)
 
         for attn, ff in self.layers:
             latents = attn(x, latents, mask) + latents
@@ -191,6 +233,7 @@ class PerceiverResampler(nn.Module):
         return self.norm(latents)
 
 
+##
 # gated cross attention
 
 

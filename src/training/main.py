@@ -500,6 +500,14 @@ def main(args):
     print("*" * 100)
     print("starting to train now: ")
 
+    if args.save_with_metric is not None:
+        if "loss" in args.save_with_metric:
+            best_metric = 100
+            metric_type = "minimize"
+        else:
+            best_metric = 0
+            metric_type = "maximize"
+
     print(model)
 
     v_total = 0
@@ -559,7 +567,7 @@ def main(args):
         completed_epoch = epoch + 1
 
         if any(v in data for v in ("val", "imagenet-val", "imagenet-v2")):
-            evaluate(
+            val_metrics = evaluate(
                 model,
                 data,
                 completed_epoch,
@@ -601,6 +609,19 @@ def main(args):
                 )
                 torch.save(checkpoint_dict, tmp_save_path)
                 os.replace(tmp_save_path, latest_save_path)
+
+            if args.save_with_metric:
+                current_metric = val_metrics[args.save_with_metric]
+                if (metric_type == "maximize" and current_metric > best_metric) or (
+                    metric_type == "minimize" and current_metric < best_metric
+                ):
+                    best_metric = current_metric
+                    torch.save(
+                        checkpoint_dict,
+                        os.path.join(
+                            args.checkpoint_path, f"best_{args.save_with_metric}.pt"
+                        ),
+                    )
 
     if args.wandb and is_master(args):
         wandb.finish()
