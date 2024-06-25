@@ -246,13 +246,13 @@ class MhDDataset(Dataset):
 
         p = torch.rand(1).item()
         if p < float(1 / 3):
-            column = "findings"
+            texts = self.tokenizer([row["findings"]]).squeeze()
         elif p < float(2 / 3):
-            column = "impression"
+            texts = self.tokenizer([row["impression"]]).squeeze()
         else:
-            column = "report_text"
-
-        texts = self.tokenizer([row[column]]).squeeze()
+            texts = self.tokenizer(
+                [row["findings"] + "\n\n" + row["impression"]]
+            ).squeeze()
 
         # print(texts)
         # input("enter to continue")
